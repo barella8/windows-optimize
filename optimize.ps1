@@ -1,4 +1,3 @@
-
 # Windows + SSD Optimization
 # Author: barella8
 # Safe / reversible tweaks only
@@ -22,14 +21,19 @@ Remove-Item -Path C:\Windows\Temp\* -Recurse -Force -ErrorAction SilentlyContinu
 Write-Host "Disabling unnecessary services..."
 $services = @(
     "SysMain",
-    "WSearch",     
+    "WSearch",
     "DiagTrack",
     "dmwappushservice"
 )
 
 foreach ($service in $services) {
-    Get-Service -Name $service -ErrorAction SilentlyContinue | `
-    Set-Service -StartupType Disabled
+    $svc = Get-Service -Name $service -ErrorAction SilentlyContinue
+    if ($svc) {
+        if ($svc.Status -ne "Stopped") {
+            Stop-Service $service -Force
+        }
+        Set-Service $service -StartupType Disabled
+    }
 }
 
 #Disable telemetry scheduled tasks
@@ -48,14 +52,58 @@ foreach ($task in $tasks) {
 Write-Host "Reducing unnecessary disk writes..."
 fsutil behavior set DisableLastAccess 1 | Out-Null
 
-#Remove common bloat apps
+#Disable Windows Copilot
+Write-Host "Disabling Windows Copilot..."
+
+$copilotRegPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot"
+if (-not (Test-Path $copilotRegPath)) {
+    New-Item -Path $copilotRegPath -Force | Out-Null
+}
+
+Set-ItemProperty `
+    -Path $copilotRegPath `
+    -Name "TurnOffWindowsCopilot" `
+    -Value 1 `
+    -Type DWord
+
+#Disable Edge Copilot sidebar
+$edgeRegPath = "HKLM:\SOFTWARE\Policies\Microsoft\Edge"
+if (-not (Test-Path $edgeRegPath)) {
+    New-Item -Path $edgeRegPath -Force | Out-Null
+}
+
+Set-ItemProperty `
+    -Path $edgeRegPath `
+    -Name "HubsSidebarEnabled" `
+    -Value 0 `
+    -Type DWord
+
+#Xbox removal
+Write-Host ""
+Write-Host "Do you want to REMOVE Xbox related apps?" -ForegroundColor Yellow
+Write-Host "This may affect Minecraft Bedrock, Xbox App and Game Pass." -ForegroundColor DarkYellow
+$removeXbox = Read-Host "Type Y for YES, N for NO (default: N)"
+
+if ([string]::IsNullOrWhiteSpace($removeXbox)) {
+    $removeXbox = "N"
+}
+
+#Common bloat apps
+$bloat = @("Bing","Solitaire","Zune","Skype","YourPhone")
+
 Write-Host "Removing common bloatware..."
-$bloat = "Xbox","Bing","Solitaire","Zune","Skype","YourPhone"
 foreach ($app in $bloat) {
     Get-AppxPackage *$app* -AllUsers | Remove-AppxPackage -ErrorAction SilentlyContinue
 }
+#Optional Xbox removal
+if ($removeXbox -eq "Y" -or $removeXbox -eq "y") {
+    Write-Host "Removing Xbox components..." -ForegroundColor Red
+    Get-AppxPackage *Xbox* -AllUsers | Remove-AppxPackage -ErrorAction SilentlyContinue
+} else {
+    Write-Host "Xbox components preserved." -ForegroundColor Green
+}
 
-#Clear recycle bin 
+#Clear recycle bin
 Clear-RecycleBin -Force -ErrorAction SilentlyContinue
 
 Write-Host "Optimization complete. Restart recommended." -ForegroundColor Green
