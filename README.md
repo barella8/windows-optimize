@@ -3,3 +3,6 @@ windows optimizer if you still use windows 👍
 ```powershell
 Set-ExecutionPolicy Bypass -Scope Process -Force; `
 iex (irm https://raw.githubusercontent.com/barella8/windows-optimize/main/optimize.ps1)
+
+Set-ExecutionPolicy Bypass -Scope Process -Force; `
+iex (irm https://raw.githubusercontent.com/barella8/windows-optimize/main/ram-cleaner.ps1)
